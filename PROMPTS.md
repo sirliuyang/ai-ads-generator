@@ -1,7 +1,9 @@
 ## 需求分析
+
 实现一个自动生成flask app代码的AI项目，生成的代码可以接受用户输入的广告投放要求，并投放到用户要求的平台上。也就是用户需要先使用项目AI主程序生成代码，然后可以使用生成代码的api去请求投放广告。
 
 ### 主程序 - AI代码生成
+
 输入: Platform name, documentation URL, and optional mock mode
 
 ```python
@@ -130,4 +132,28 @@ def launch_campaign():
     })
 ```
 
-## 实现架构
+## 架构设计
+
+ai-ads-generator\
+├── flask_api\
+│ ├── app.py
+│ └── config.py
+│
+├── generated_clients\
+│
+├── service\
+│ ├── code_agent.py
+│ ├── llm_remote.py
+│ └── platform_doc_parser.py
+│
+├── tests\
+│ ├── test_agent.py
+│ └── test_clients.py
+│
+├── .env.example
+├── .gitignore
+├── PROMPTS.md
+├── README.md
+├── main.py
+├── quickstart.sh
+└── requirements.txt
