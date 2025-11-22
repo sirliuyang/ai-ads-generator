@@ -1,12 +1,40 @@
 ## 需求分析
+实现一个自动生成flask app代码的AI项目，生成的代码可以接受用户输入的广告投放要求，并投放到用户要求的平台上。也就是用户需要先使用项目AI主程序生成代码，然后可以使用生成代码的api去请求投放广告。
 
-### 需求描述
+### 主程序 - AI代码生成
+输入: Platform name, documentation URL, and optional mock mode
 
-实现一个自动生成flask app代码的AI项目，生成的代码可以接受用户输入的广告投放要求，并投放到用户要求的平台上。
+```python
+# Example usage - WITH mock auth (for testing without credentials)
+agent.generate_api_client(
+    platform="snapchat",
+    docs_url="https://developers.snap.com/api/marketing-api/Ads-API/ads",
+    mock_auth=True  # Returns mock responses, no real API calls
+)
 
-### 输入输出
+# Example usage - WITHOUT mock auth (production-ready code)
+agent.generate_api_client(
+    platform="snapchat",
+    docs_url="https://developers.snap.com/api/marketing-api/Ads-API/ads"
+    # No mock_auth - generates real API client that works with actual credentials
+)
+# Output: Creates snapchat_api.py with functions to create campaigns, ad squads, ads
+```
 
-这个项目实现后，使用方法如下：
+**How it works**:
+
+- Use tool calling to search/fetch API documentation
+- Extract authentication, endpoints, request schemas, hierarchy
+- Generate a Python module with functions like:
+    - `create_campaign(account_id, name, budget, ...)`
+    - `create_ad_squad(campaign_id, name, bid, ...)`
+    - `create_ad(ad_squad_id, name, creative, ...)`
+- **Optional mock mode**:
+    - With `--mock-auth`: Generate code that returns mock responses (no real API calls, no credentials needed)
+    - Without `--mock-auth`: Generate production-ready code that makes real API calls with proper authentication
+- Save the generated code to a file (e.g., `snapchat_api.py`, `pinterest_api.py`)
+
+这个项目实现后，需要测试三种模式：
 **Option A: Testing Mode (with mock auth)**, 也就是测试模式，不需要真实的API认证，只需要生成一个模拟的API客户端，然后使用这个客户端进行投放。
 
 ```bash
@@ -46,9 +74,13 @@ python agent.py --platform pinterest --docs https://developers.pinterest.com/doc
 # POST with platform="pinterest" → uses pinterest_api.py
 ```
 
-### 生成的xxxx_api.py代码使用
+### 生成的xxxx_api.py接口
 
-#### 输入JSON
+对于不同的平台，生成不一样的API客户端，并使用这个客户端进行投放。具体的使用方式如下：
+
+#### `POST /api/launch-campaign`
+
+**Request Body Example**:
 
 ```json
 {
@@ -74,8 +106,28 @@ python agent.py --platform pinterest --docs https://developers.pinterest.com/doc
 }
 ```
 
-#### 输出
+**Flask endpoint logic**:
 
-投放成功
+```python
+# Import the generated API client
+from snapchat_api import create_campaign, create_ad_squad, create_ad
+
+
+@app.route('/api/launch-campaign', methods=['POST'])
+def launch_campaign():
+    data = request.json
+
+    # Use generated functions
+    campaign = create_campaign(data['account_id'], data['campaign'])
+    ad_squad = create_ad_squad(campaign['id'], data['ad_squads'][0])
+    ad = create_ad(ad_squad['id'], data['ads'][0])
+
+    return jsonify({
+        "status": "success",
+        "campaign_id": campaign['id'],
+        "ad_squad_ids": [ad_squad['id']],
+        "ad_ids": [ad['id']]
+    })
+```
 
 ## 实现架构
