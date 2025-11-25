@@ -143,21 +143,23 @@ def launch_campaign():
 
 ## 架构设计
 
+先提出一个自己的架构想法如下：
+
 ai-ads-generator\
 ├── flask_api\
-│ ├── app.py
-│ └── config.py
+│   ├── app.py
+│   └── config.py
 │
 ├── generated_clients\
 │
 ├── service\
-│ ├── code_agent.py
-│ ├── llm_remote.py
-│ └── platform_doc_parser.py
+│   ├── code_agent.py
+│   ├── llm_remote.py
+│   └── platform_doc_parser.py
 │
 ├── tests\
-│ ├── test_agent.py
-│ └── test_clients.py
+│   ├── test_agent.py
+│   └── test_clients.py
 │
 ├── .env.example
 ├── .gitignore
@@ -166,3 +168,6 @@ ai-ads-generator\
 ├── main.py
 ├── quickstart.sh
 └── requirements.txt
+
+
+然后让AI快速生成基础代码。
