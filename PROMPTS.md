@@ -1,3 +1,12 @@
+## 业务背景了解
+
+在需求分析和POC的时候，发现需要先了解业务。
+
+refer to:
+
+- [Ads_Concept.md](./Ads_Concept.md)
+- [Snapchat_usage.md](./Snapchat_usage.md) 
+
 ## 需求分析
 
 实现一个自动生成flask app代码的AI项目，生成的代码可以接受用户输入的广告投放要求，并投放到用户要求的平台上。也就是用户需要先使用项目AI主程序生成代码，然后可以使用生成代码的api去请求投放广告。
