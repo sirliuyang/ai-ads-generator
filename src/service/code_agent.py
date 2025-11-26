@@ -2,17 +2,20 @@
 # @Author  : Leon
 # @Email   : 88978827@qq.com
 """
-Code Agent - Main orchestrator for API client generation
+Code Agent - 三阶段代码生成
+Stage 1: 生成基础API函数
+Stage 2: 生成launch_campaign orchestrator
+Stage 3: 整合并检查语法
 """
 import os
-from typing import Optional
+from typing import Optional, Dict
 from .platform_doc_parser import PlatformDocParser
 from .llm_remote import LLMRemote
 
 
 class CodeAgent:
     """
-    AI Agent that generates platform-specific API clients
+    AI Agent that generates platform-specific API clients in 3 stages
     """
 
     def __init__(self):
@@ -28,49 +31,113 @@ class CodeAgent:
             output_dir: str = 'src/generated_clients'
     ) -> str:
         """
-        Generate a complete API client for the specified platform
+        Generate a complete API client in 3 stages
 
         Args:
-            platform: Platform name (e.g., 'snapchat', 'pinterest')
+            platform: Platform name (e.g., 'snapchat')
             docs_url: URL to API documentation
-            mock_auth: If True, generate mock client; if False, generate production client
+            mock_auth: If True, generate mock client
             output_dir: Directory to save generated code
 
         Returns:
             Path to generated file
         """
-        print(f"\n{'=' * 60}")
-        print(f"Step 1: Parsing API documentation")
-        print(f"{'=' * 60}")
+        print(f"\n{'=' * 70}")
+        print(f"三阶段代码生成 - {platform.upper()}")
+        print(f"{'=' * 70}\n")
 
         # Parse API documentation
+        print(f"Stage 0: 解析API文档")
+        print(f"{'=' * 70}")
         api_info = self.doc_parser.get_api_info(docs_url, platform)
 
-        print(f"\n{'=' * 60}")
-        print(f"Step 2: Generating Python code with LLM")
-        print(f"{'=' * 60}")
+        # Load step prompts
+        step1_prompt = self._load_step_prompt(platform, 1)
+        step2_prompt = self._load_step_prompt(platform, 2)
 
-        # Generate code using LLM
-        code = self.llm.generate_api_client_code(
+        # Stage 1: Generate basic API functions
+        print(f"\nStage 1: 生成基础API函数")
+        print(f"{'=' * 70}")
+        stage1_code = self.llm.generate_stage1_code(
             platform=platform,
             api_info=api_info,
+            mock_auth=mock_auth,
+            step1_prompt=step1_prompt
+        )
+        print(f"✓ Stage 1 完成 ({len(stage1_code)} 字符)")
+
+        # Stage 2: Generate launch_campaign orchestrator
+        print(f"\nStage 2: 生成 launch_campaign orchestrator")
+        print(f"{'=' * 70}")
+        stage2_code = self.llm.generate_stage2_code(
+            platform=platform,
+            api_info=api_info,
+            mock_auth=mock_auth,
+            step2_prompt=step2_prompt,
+            stage1_code=stage1_code
+        )
+        print(f"✓ Stage 2 完成 ({len(stage2_code)} 字符)")
+
+        # Stage 3: Integrate and check syntax
+        print(f"\nStage 3: 整合代码并检查语法")
+        print(f"{'=' * 70}")
+        final_code = self.llm.generate_stage3_code(
+            platform=platform,
+            stage1_code=stage1_code,
+            stage2_code=stage2_code,
             mock_auth=mock_auth
         )
-
-        print(f"\n{'=' * 60}")
-        print(f"Step 3: Saving generated code")
-        print(f"{'=' * 60}")
+        print(f"✓ Stage 3 完成 ({len(final_code)} 字符)")
 
         # Save to file
-        output_file = self._save_code(code, platform, output_dir)
+        print(f"\n{'=' * 70}")
+        print(f"保存生成的代码")
+        print(f"{'=' * 70}")
+        output_file = self._save_code(final_code, platform, output_dir)
 
         # Add __init__.py if needed
         self._ensure_init_file(output_dir)
 
-        print(f"✓ Code saved to: {output_file}")
-        print(f"✓ Generated {len(code.split('def ')) - 1} functions")
+        print(f"\n✓ 代码已保存到: {output_file}")
+        print(f"✓ 包含函数数量: {final_code.count('def ')}")
+
+        # Generate Flask route hint
+        self._print_flask_integration_hint(platform)
 
         return output_file
+
+    def _load_step_prompt(self, platform: str, step: int) -> Optional[str]:
+        """
+        Load step-specific prompt file
+
+        Args:
+            platform: Platform name
+            step: Step number (1 or 2)
+
+        Returns:
+            Prompt content or None
+        """
+        # Try multiple locations
+        possible_paths = [
+            f'{platform}_step{step}.md',
+            f'{platform}_step{step}.txt',
+            f'prompts/{platform}_step{step}.md',
+            f'prompts/{platform}_step{step}.txt',
+        ]
+
+        for path in possible_paths:
+            if os.path.exists(path):
+                try:
+                    with open(path, 'r', encoding='utf-8') as f:
+                        content = f.read().strip()
+                        if content:
+                            print(f"  ✓ 加载提示文件: {path}")
+                            return content
+                except Exception as e:
+                    print(f"  ⚠ 读取 {path} 失败: {e}")
+
+        print(f"  ⚠ 未找到 {platform}_step{step} 提示文件")
+        return None
 
     def _save_code(self, code: str, platform: str, output_dir: str) -> str:
         """
@@ -94,8 +161,17 @@ class CodeAgent:
         # Add header comment
         header = f'''"""
 {platform.upper()} Advertising API Client
-Auto-generated by AI Ads Generator
+Auto-generated by AI Ads Generator (3-Stage Generation)
 Platform: {platform}
+
+This client includes:
+1. Individual API functions (create_campaign, create_ad_squad, etc.)
+2. launch_campaign orchestrator (handles complete workflow)
+3. Proper error handling and logging
+
+To use in Flask:
+1. Import this module in src/flask_api/api.py
+2. Register routes manually
 """
 
 '''
@@ -112,3 +188,24 @@ Platform: {platform}
         if not os.path.exists(init_file):
             with open(init_file, 'w') as f:
                 f.write('"""Generated API clients"""\n')
+
+    def _print_flask_integration_hint(self, platform: str):
+        """Print hint for Flask integration"""
+        print(f"\n{'=' * 70}")
+        print(f"Flask 集成提示")
+        print(f"{'=' * 70}")
+        print(f"\n在 src/flask_api/api.py 中添加以下代码：\n")
+        print(f"# 导入生成的客户端")
+        print(f"from src.generated_clients.{platform}_api import launch_campaign as {platform}_launch\n")
+        print(f"# 注册路由")
+        print(f"@app.route('/api/{platform}/launch-campaign', methods=['POST'])")
+        print(f"def {platform}_launch_campaign():")
+        print(f"    data = request.get_json()")
+        print(f"    result = {platform}_launch(")
+        print(f"        account_id=data['account_id'],")
+        print(f"        campaign_data=data['campaign'],")
+        print(f"        ad_squads_data=data['ad_squads'],")
+        print(f"        ads_data=data['ads']")
+        print(f"    )")
+        print(f"    return jsonify(result)")
+        print()
