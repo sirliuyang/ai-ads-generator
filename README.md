@@ -4,24 +4,9 @@
 
 ### 步骤 1: 准备提示文件
 
-在项目根目录创建：
-
-**snapchat_step1.md** - API示例代码
-
-```markdown
-# Snapchat API 示例
-
-（包含create_campaign, create_ad_squad等的实际代码）
-```
-
-**snapchat_step2.txt** - 工作流说明
-
-```
-Snapchat广告投放完整工作流
-步骤1: 创建Campaign
-步骤2: 创建Ad Squad
-...
-```
+参考根目录下面的两个提示文件:
+snapchat_step1.md
+snapchat_step2.txt
 
 ### 步骤 2: 生成API客户端
 
