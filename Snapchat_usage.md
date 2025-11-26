@@ -11,7 +11,7 @@
 7. 获得 token
 8. 创建一个Ad Campaign
 9. 创建一个Ad Squad
-10. 创建一个creative
+10. 创建一个creative(也就是上传图片)
 11. 创建一个Ad(如果没有绑定卡，public profile会失败)
 
 ## Get Token
