@@ -1,11 +1,6 @@
 # @Home    : www.pi-apple.com
 # @Author  : Leon
 # @Email   : 88978827@qq.com
-
-"""
-Enhanced Platform API Documentation Parser
-Fetches and extracts detailed information from API documentation
-"""
 import requests
 from bs4 import BeautifulSoup
 from lxml import html as lxml_html
