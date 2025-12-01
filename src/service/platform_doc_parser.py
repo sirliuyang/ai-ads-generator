@@ -1,17 +1,16 @@
-# @Home    : www.pi-apple.com
-# @Author  : Leon
-# @Email   : 88978827@qq.com
-
+# @Home : www.pi-apple.com
+# @Author : Leon
+# @Email : 88978827@qq.com
 """
 Enhanced Platform API Documentation Parser
 Fetches and extracts detailed information from API documentation
 """
 import requests
 from bs4 import BeautifulSoup
-from lxml import html as lxml_html
 from typing import Dict, List
 import re
 import json
+from lxml import etree
 
 
 class PlatformDocParser:
@@ -23,56 +22,23 @@ class PlatformDocParser:
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         })
 
-    def get_api_html(self, url: str, platform: str, xpath: str) -> Dict:
-        """
-        使用XPath直接定位API文档的特定部分并解析
-
-        Args:
-            url: API文档URL
-            platform: 平台名称 (如 'snapchat')
-            xpath: XPath表达式，用于定位目标HTML元素
-                   例如: "//div[@class='api-content']" 或 "//article"
-
-        Returns:
-            解析后的API信息字典
-        """
-        # 1. 获取完整的HTML内容
-        full_html = self.fetch_documentation(url)
-
-        # 2. 使用lxml解析HTML
-        tree = lxml_html.fromstring(full_html)
-
-        # 3. 使用XPath查找目标元素
+    def get_api_html(self, url: str, platform: str, xpath: str):
+        html = self.fetch_documentation(url)
+        tree = etree.HTML(html)
         elements = tree.xpath(xpath)
-
         if not elements:
-            print(f"⚠️ 警告: XPath '{xpath}' 未找到任何匹配元素，将使用完整文档")
-            target_html = full_html
-        else:
-            # 取第一个匹配的元素
-            target_element = elements[0]
-
-            # 4. 将元素转换回HTML字符串
-            if isinstance(target_element, lxml_html.HtmlElement):
-                target_html = lxml_html.tostring(target_element, encoding='unicode', pretty_print=True)
-            else:
-                # 如果是文本节点或其他类型
-                target_html = str(target_element) if not isinstance(target_element, str) else target_element
-
-            print(f"✓ XPath '{xpath}' 定位成功，提取内容长度: {len(target_html)} 字符")
-
-        # 5. 直接解析目标HTML（不需要进一步手动解析）
-        api_info = self.parse_api_structure(target_html, platform)
-
+            raise Exception(f"No elements found with xpath: {xpath}")
+        # Take the first matching element
+        elem = elements[0]
+        html_content = etree.tostring(elem, encoding='unicode', method='html')
+        api_info = self.parse_api_structure(html_content, platform)
         return api_info
 
     def fetch_documentation(self, url: str) -> str:
         """
         Fetch raw documentation content from URL
-
         Args:
             url: API documentation URL
-
         Returns:
             Raw HTML/text content
         """
@@ -86,40 +52,29 @@ class PlatformDocParser:
     def parse_api_structure(self, html_content: str, platform: str) -> Dict:
         """
         Parse API documentation to extract comprehensive information
-
         Args:
             html_content: Raw HTML content
             platform: Platform name
-
         Returns:
             Dictionary containing detailed API structure information
         """
         soup = BeautifulSoup(html_content, 'html.parser')
-
         # Extract all text content
         text_content = soup.get_text(separator='\n', strip=True)
-
         # Extract code blocks with better parsing
         code_blocks = self._extract_code_blocks(soup)
-
         # Extract endpoints with detailed information
         endpoints = self._extract_detailed_endpoints(text_content, code_blocks, soup)
-
         # Extract authentication information
         auth_info = self._extract_auth_info(text_content)
-
         # Extract entity hierarchy
         hierarchy = self._extract_hierarchy(text_content, platform)
-
         # Extract request/response schemas
         schemas = self._extract_schemas(soup, text_content)
-
         # Extract dependencies and workflow
         workflow = self._extract_workflow(text_content, endpoints, platform)
-
         # Extract base URL patterns
         base_url = self._extract_base_url(text_content, endpoints, platform)
-
         return {
             'platform': platform,
             'base_url': base_url,
@@ -128,14 +83,13 @@ class PlatformDocParser:
             'hierarchy': hierarchy,
             'schemas': schemas,
             'workflow': workflow,
-            'raw_text': text_content[:10000],  # First 10000 chars for context
-            'code_examples': code_blocks[:20]  # First 20 code blocks
+            'raw_text': text_content[:20000],  # First 10000 chars for context
+            'code_examples': code_blocks[:200]  # First 20 code blocks
         }
 
     def _extract_code_blocks(self, soup: BeautifulSoup) -> List[str]:
         """Extract code blocks from documentation"""
         code_blocks = []
-
         # Try different code block tags
         for tag in ['code', 'pre', 'div.highlight', 'div.code-block']:
             elements = soup.select(tag)
@@ -143,7 +97,6 @@ class PlatformDocParser:
                 code_text = elem.get_text(strip=True)
                 if len(code_text) > 20:  # Filter out very short snippets
                     code_blocks.append(code_text)
-
         return code_blocks
 
     def _extract_detailed_endpoints(
@@ -155,10 +108,8 @@ class PlatformDocParser:
         """Extract detailed API endpoints with methods, paths, and descriptions"""
         endpoints = []
         seen = set()
-
         # Combine text and code blocks for analysis
         content = text + '\n' + '\n'.join(code_blocks)
-
         # Enhanced patterns for endpoint detection
         patterns = [
             # Standard REST format: POST /v1/campaigns
@@ -172,7 +123,6 @@ class PlatformDocParser:
             r'(/creatives)',
             r'(/adsquads/[{\w\-}]+/[\w\-/{}:]+)'
         ]
-
         for pattern in patterns:
             matches = re.finditer(pattern, content, re.IGNORECASE | re.MULTILINE)
             for match in matches:
@@ -185,22 +135,17 @@ class PlatformDocParser:
                     method = self._infer_http_method(path, content)
                 else:
                     continue
-
                 # Clean path
                 path = path.strip()
-
                 # Create unique key
                 key = f"{method}:{path}"
                 if key in seen:
                     continue
                 seen.add(key)
-
                 # Extract description
                 description = self._extract_endpoint_description(path, soup, text)
-
                 # Determine resource type
                 resource_type = self._determine_resource_type(path)
-
                 endpoint_info = {
                     'method': method,
                     'path': path,
@@ -208,19 +153,15 @@ class PlatformDocParser:
                     'resource_type': resource_type,
                     'requires_parent': '{' in path or '/' in path[1:]  # Has path params
                 }
-
                 endpoints.append(endpoint_info)
-
         # Sort by typical workflow order
         priority_order = ['campaign', 'squad', 'media', 'creative', 'ad']
         endpoints.sort(key=lambda x: self._endpoint_priority(x, priority_order))
-
         return endpoints[:30]  # Limit to 30 most relevant endpoints
 
     def _infer_http_method(self, path: str, context: str) -> str:
         """Infer HTTP method from path and context"""
         path_lower = path.lower()
-
         # Look for method mentions near the path in context
         path_index = context.lower().find(path_lower)
         if path_index != -1:
@@ -228,7 +169,6 @@ class PlatformDocParser:
             for method in ['post', 'get', 'put', 'delete', 'patch']:
                 if method in nearby_text:
                     return method.upper()
-
         # Default heuristics
         if '/upload' in path_lower:
             return 'POST'
@@ -236,7 +176,6 @@ class PlatformDocParser:
             return 'POST'
         elif '{id}' in path and path.endswith('}'):
             return 'GET'
-
         return 'POST'  # Default
 
     def _extract_endpoint_description(
@@ -249,7 +188,6 @@ class PlatformDocParser:
         # Try to find description near the endpoint mention
         path_lower = path.lower()
         lines = text.split('\n')
-
         for i, line in enumerate(lines):
             if path_lower in line.lower():
                 # Look at surrounding lines
@@ -258,13 +196,11 @@ class PlatformDocParser:
                 if len(description) > 200:
                     description = description[:200] + '...'
                 return description
-
         return f"API endpoint: {path}"
 
     def _determine_resource_type(self, path: str) -> str:
         """Determine the resource type from path"""
         path_lower = path.lower()
-
         if 'campaign' in path_lower:
             return 'campaign'
         elif 'squad' in path_lower or 'adgroup' in path_lower:
@@ -275,7 +211,6 @@ class PlatformDocParser:
             return 'creative'
         elif path_lower.endswith('/ads') or '/ads/' in path_lower:
             return 'ad'
-
         return 'unknown'
 
     def _endpoint_priority(self, endpoint: Dict, priority_order: List[str]) -> int:
@@ -295,36 +230,29 @@ class PlatformDocParser:
             'header_name': 'Authorization',
             'header_format': 'Bearer {token}'
         }
-
         text_lower = text.lower()
-
         # Detect OAuth
         if 'oauth' in text_lower or 'access token' in text_lower or 'bearer' in text_lower:
             auth_info['type'] = 'oauth2'
             auth_info['methods'].append('Bearer Token')
-
         # Detect API Key
         if 'api key' in text_lower or 'api_key' in text_lower:
             auth_info['methods'].append('API Key')
-
         # Extract header information
         header_patterns = [
             (r'authorization:\s*bearer\s+', 'Authorization', 'Bearer {token}'),
             (r'x-api-key', 'X-API-Key', '{token}'),
         ]
-
         for pattern, header_name, format_str in header_patterns:
             if re.search(pattern, text_lower):
                 auth_info['header_name'] = header_name
                 auth_info['header_format'] = format_str
                 break
-
         return auth_info
 
     def _extract_hierarchy(self, text: str, platform: str) -> List[str]:
         """Extract entity hierarchy with better detection"""
         text_lower = text.lower()
-
         # Platform-specific hierarchies
         known_hierarchies = {
             'snapchat': ['campaign', 'ad_squad', 'ad'],
@@ -333,7 +261,6 @@ class PlatformDocParser:
             'google': ['campaign', 'ad_group', 'ad'],
             'tiktok': ['campaign', 'ad_group', 'ad'],
         }
-
         # Try to detect from text
         if 'ad squad' in text_lower or 'adsquad' in text_lower:
             return ['campaign', 'ad_squad', 'ad']
@@ -341,14 +268,12 @@ class PlatformDocParser:
             return ['campaign', 'ad_group', 'ad']
         elif 'ad set' in text_lower or 'adset' in text_lower:
             return ['campaign', 'ad_set', 'ad']
-
         # Return known hierarchy or default
         return known_hierarchies.get(platform.lower(), ['campaign', 'ad_group', 'ad'])
 
     def _extract_schemas(self, soup: BeautifulSoup, text: str) -> Dict:
         """Extract request/response schemas"""
         schemas = {}
-
         # Look for JSON examples in code blocks
         code_blocks = soup.find_all(['code', 'pre'])
         for block in code_blocks:
@@ -366,7 +291,6 @@ class PlatformDocParser:
                         schemas['creative'] = json_obj
                 except:
                     pass
-
         return schemas
 
     def _extract_workflow(self, text: str, endpoints: List[Dict], platform: str) -> Dict:
@@ -376,36 +300,29 @@ class PlatformDocParser:
             'dependencies': {},
             'notes': []
         }
-
         # Analyze text for workflow clues
         text_lower = text.lower()
-
         # Common workflow patterns
         if 'first' in text_lower and 'campaign' in text_lower:
             workflow['notes'].append('Create campaign first')
-
         if 'before' in text_lower or 'after' in text_lower:
             # Extract sentences with workflow information
             sentences = text.split('.')
             for sentence in sentences:
                 if 'before' in sentence.lower() or 'after' in sentence.lower():
                     workflow['notes'].append(sentence.strip())
-
         # Infer workflow from endpoints
         resource_order = []
         for endpoint in endpoints:
             resource_type = endpoint.get('resource_type')
             if resource_type and resource_type not in resource_order:
                 resource_order.append(resource_type)
-
         workflow['steps'] = resource_order
-
         # Build dependency map from endpoints
         for endpoint in endpoints:
             if endpoint.get('requires_parent'):
                 resource = endpoint.get('resource_type')
                 path = endpoint.get('path', '')
-
                 # Detect parent dependencies from path
                 if '{campaign' in path.lower():
                     workflow['dependencies'][resource] = workflow['dependencies'].get(resource, []) + ['campaign']
@@ -413,7 +330,6 @@ class PlatformDocParser:
                     workflow['dependencies'][resource] = workflow['dependencies'].get(resource, []) + ['ad_squad']
                 if '{media' in path.lower():
                     workflow['dependencies'][resource] = workflow['dependencies'].get(resource, []) + ['media']
-
         return workflow
 
     def _extract_base_url(self, text: str, endpoints: List[Dict], platform: str) -> str:
@@ -421,13 +337,11 @@ class PlatformDocParser:
         # Look for base URL in text
         base_url_pattern = r'https?://[\w\-.]+\.com/v\d+'
         matches = re.findall(base_url_pattern, text)
-
         if matches:
             # Return most common base URL
             from collections import Counter
             counter = Counter(matches)
             return counter.most_common(1)[0][0]
-
         # Common base URLs for known platforms
         known_base_urls = {
             'snapchat': 'https://adsapi.snapchat.com/v1',
@@ -435,31 +349,25 @@ class PlatformDocParser:
             'facebook': 'https://graph.facebook.com/v18.0',
             'tiktok': 'https://business-api.tiktok.com/open_api/v1.3',
         }
-
         return known_base_urls.get(platform.lower(), f'https://api.{platform}.com/v1')
 
     def get_api_info(self, url: str, platform: str) -> Dict:
         """
         Main method to fetch and parse comprehensive API documentation
-
         Args:
             url: API documentation URL
             platform: Platform name
-
         Returns:
             Comprehensive API information
         """
         print(f"Fetching documentation from: {url}")
         html_content = self.fetch_documentation(url)
-
         print(f"Parsing comprehensive API structure for {platform}...")
         api_info = self.parse_api_structure(html_content, platform)
-
         print(f"✓ Found {len(api_info['endpoints'])} endpoints")
         print(f"✓ Detected auth type: {api_info['authentication']['type']}")
         print(f"✓ Entity hierarchy: {' -> '.join(api_info['hierarchy'])}")
         print(f"✓ Base URL: {api_info['base_url']}")
         if api_info['workflow']['steps']:
             print(f"✓ Workflow steps: {' -> '.join(api_info['workflow']['steps'])}")
-
         return api_info
