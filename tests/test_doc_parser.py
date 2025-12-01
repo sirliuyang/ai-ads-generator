@@ -3,7 +3,7 @@ from src.service.platform_doc_parser import PlatformDocParser
 
 def parse_doc(docs_url: str, platform: str):
     doc_parser = PlatformDocParser()
-    api_info = doc_parser.get_api_info(docs_url, platform)
+    api_info = doc_parser.get_api_html(docs_url, platform, "//div[@class='theme-doc-markdown markdown']")
     print(api_info)
 
 
