@@ -3,7 +3,6 @@
 # @Email   : 88978827@qq.com
 import requests
 from bs4 import BeautifulSoup
-from lxml import html as lxml_html
 from typing import Dict, List
 import re
 import json
@@ -17,49 +16,6 @@ class PlatformDocParser:
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         })
-
-    def get_api_html(self, url: str, platform: str, xpath: str) -> Dict:
-        """
-        使用XPath直接定位API文档的特定部分并解析
-
-        Args:
-            url: API文档URL
-            platform: 平台名称 (如 'snapchat')
-            xpath: XPath表达式，用于定位目标HTML元素
-                   例如: "//div[@class='api-content']" 或 "//article"
-
-        Returns:
-            解析后的API信息字典
-        """
-        # 1. 获取完整的HTML内容
-        full_html = self.fetch_documentation(url)
-
-        # 2. 使用lxml解析HTML
-        tree = lxml_html.fromstring(full_html)
-
-        # 3. 使用XPath查找目标元素
-        elements = tree.xpath(xpath)
-
-        if not elements:
-            print(f"⚠️ 警告: XPath '{xpath}' 未找到任何匹配元素，将使用完整文档")
-            target_html = full_html
-        else:
-            # 取第一个匹配的元素
-            target_element = elements[0]
-
-            # 4. 将元素转换回HTML字符串
-            if isinstance(target_element, lxml_html.HtmlElement):
-                target_html = lxml_html.tostring(target_element, encoding='unicode', pretty_print=True)
-            else:
-                # 如果是文本节点或其他类型
-                target_html = str(target_element) if not isinstance(target_element, str) else target_element
-
-            print(f"✓ XPath '{xpath}' 定位成功，提取内容长度: {len(target_html)} 字符")
-
-        # 5. 直接解析目标HTML（不需要进一步手动解析）
-        api_info = self.parse_api_structure(target_html, platform)
-
-        return api_info
 
     def fetch_documentation(self, url: str) -> str:
         """
