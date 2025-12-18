@@ -2,11 +2,13 @@
 
 ## 🚀 使用流程
 
-### 步骤 1: 准备提示文件
+### 步骤 1: 配置.env文件
 
-参考根目录下面的两个提示文件:
-snapchat_step1.md
-snapchat_step2.txt
+```shell
+cp .env.example .env
+```
+
+编辑`.env`文件，填写LLM API KEY和平台API凭证
 
 ### 步骤 2: 生成API客户端
 
