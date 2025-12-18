@@ -16,7 +16,7 @@ class LLMRemote:
     def __init__(self):
         """Initialize LLM client"""
         api_key = os.getenv('OPENAI_API_KEY')
-        api_base = os.getenv('DEEPSEEK_API_BASE', 'https://api.deepseek.com/v1')
+        api_base = os.getenv('API_BASE', 'https://api.deepseek.com/v1')
 
         if not api_key:
             raise ValueError("OPENAI_API_KEY not found in environment")
